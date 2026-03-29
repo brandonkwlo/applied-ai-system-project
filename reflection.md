@@ -2,6 +2,14 @@
 
 ## 1. System Design
 
+### Core User Actions
+
+The PawPal+ user has the ability to perform the following actions:
+
+- Add owner and pet info - enter the owner info (i.e. name) and pet info (i.e. name, breed, age, species, health history)
+- Add or edit their pet care tasks - tasks will be given a duration and priority level
+- Generate a daily plan - System with generate a daily plan based on the information added and then generate an explanation for the system's chosen plan
+
 **a. Initial design**
 
 - Briefly describe your initial UML design.
