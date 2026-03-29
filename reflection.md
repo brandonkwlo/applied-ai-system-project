@@ -39,7 +39,7 @@ Key design change was updating the pets object. I have now allowed the owner to 
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
 - How did you decide which constraints mattered most?
 
-The scheduler is constrained by the time, priority and duration of the task(s). Those three constraints are more important to consider as the app wants the user to create and modify their pets' plan based on the duration and priority of the task.
+The scheduler considers four constraints: the owner's total time_available, each task's duration, its priority, and whether it has a fixed must_occur_at time. Fixed-time tasks were prioritized first because missing them (like medication) has real consequences — they anchor the schedule. Duration and priority then determine which flexible tasks fill the remaining time, with higher priority tasks scheduled before lower ones. time_available acts as a hard cap — tasks that don't fit are skipped entirely.
 
 **b. Tradeoffs**
 

@@ -30,6 +30,25 @@ PawPal+ includes three scheduling utilities to help owners manage their daily pl
 - Filter tasks — narrow the task list by pet name, completion status, or both
 - Conflict detection — automatically warns when two tasks are scheduled at the same time, grouped by time slot into a single readable message
 
+## Testing PawPal+
+
+Tests are located in tests/test_pawpal.py and cover the following behaviors:
+
+- Task completion status and pet task count
+- Schedule generation across multiple pets
+- Chronological sort order with correct AM/PM handling (including 12:00 AM/PM edge cases)
+- Daily recurrence creating a next-day occurrence via timedelta
+- Conflict detection flagging duplicate scheduled times
+- Unscheduled recurring tasks being ignored by conflict detection
+
+To run all tests:
+
+```
+uv run pytest
+```
+
+Confidence Level: 5/5 Stars (All tests passed!)
+
 ## Getting started
 
 ### Setup
