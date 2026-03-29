@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from typing import Optional
 
 
@@ -15,6 +16,7 @@ class Task:
     frequency: str = "daily"
     must_occur_at: str = ""  # e.g. "08:00 AM", empty means flexible
     is_completed: bool = False
+    due_date: date = field(default_factory=date.today)
 
     def get_task_info(self) -> dict:
         """Return all task attributes as a dictionary."""
@@ -29,11 +31,29 @@ class Task:
             "frequency": self.frequency,
             "must_occur_at": self.must_occur_at,
             "is_completed": self.is_completed,
+            "due_date": self.due_date.isoformat(),
         }
 
-    def mark_complete(self) -> None:
-        """Mark this task as completed."""
+    def mark_complete(self) -> Optional[Task]:
+        """Mark this task complete and return the next occurrence, or None if not recurring."""
         self.is_completed = True
+        if self.frequency == "daily":
+            next_due = self.due_date + timedelta(days=1)
+        elif self.frequency == "weekly":
+            next_due = self.due_date + timedelta(weeks=1)
+        else:
+            return None
+        return Task(
+            name=self.name,
+            category=self.category,
+            duration=self.duration,
+            priority=self.priority,
+            pet_name=self.pet_name,
+            description=self.description,
+            must_occur_at=self.must_occur_at,
+            frequency=self.frequency,
+            due_date=next_due,
+        )
 
 
 @dataclass
@@ -158,6 +178,33 @@ class Scheduler:
         """Delegate task editing to the owner for the specified pet."""
         self.owner.edit_task(pet_name, task_name, changes)
 
+    def detect_conflicts(self) -> list[str]:
+        """Return one warning per conflicting time slot; empty list means no conflicts."""
+        from collections import defaultdict
+        buckets: dict[int, list[Task]] = defaultdict(list)
+        for task, time_slot in self.plan:
+            if time_slot:
+                buckets[self._time_to_minutes(time_slot)].append(task)
+        warnings = []
+        for tasks in buckets.values():
+            if len(tasks) > 1:
+                names = ", ".join(f"'{t.name}' ({t.pet_name})" for t in tasks)
+                warnings.append(f"Conflict at {tasks[0].scheduled_time}: {names}")
+        return warnings
+
+    def complete_task(self, pet_name: str, task_name: str) -> Optional[Task]:
+        """Mark a task complete and auto-schedule the next occurrence for recurring tasks."""
+        pet = self.owner.get_pet(pet_name)
+        if not pet:
+            return None
+        for task in pet.tasks:
+            if task.name == task_name and not task.is_completed:
+                next_task = task.mark_complete()
+                if next_task:
+                    pet.add_task(next_task)
+                return next_task
+        return None
+
     def generate_plan(self) -> list[tuple[Task, str]]:
         """
         Schedule tasks within owner's available time.
@@ -227,6 +274,40 @@ class Scheduler:
                 lines.append(f"  - {task.name} ({task.pet_name}, {task.duration} min)")
 
         return "\n".join(lines)
+
+    def filter_tasks(
+        self,
+        pet_name: str | None = None,
+        completed: bool | None = None,
+    ) -> list[Task]:
+        """Filter tasks by pet name, completion status, or both; omit a parameter to skip that filter."""
+        tasks = self.get_all_tasks()
+        if pet_name is not None:
+            tasks = [t for t in tasks if t.pet_name == pet_name]
+        if completed is not None:
+            tasks = [t for t in tasks if t.is_completed == completed]
+        return tasks
+
+    def sort_by_time(self) -> list[Task]:
+        """Sort all tasks chronologically by scheduled_time; unscheduled tasks go last."""
+        tasks = self.get_all_tasks()
+        return sorted(
+            tasks,
+            key=lambda t: self._time_to_minutes(t.scheduled_time) if t.scheduled_time else 9999
+        )
+
+    def _time_to_minutes(self, time_str: str) -> int:
+        """Convert a time string (e.g. '03:00 PM') to total minutes from midnight for sorting."""
+        try:
+            time_part, period = time_str.strip().rsplit(" ", 1)
+            hours, mins = map(int, time_part.split(":"))
+            if period.upper() == "AM":
+                hours = hours % 12        # 12:xx AM -> 0:xx
+            else:
+                hours = hours % 12 + 12   # 12:xx PM -> 12:xx, 1:xx PM -> 13:xx
+            return hours * 60 + mins
+        except (ValueError, AttributeError):
+            return 9999
 
     def _minutes_to_time(self, minutes: int) -> str:
         """Convert an integer minute offset from midnight to a 12-hour time string."""

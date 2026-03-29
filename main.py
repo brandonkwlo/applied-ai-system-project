@@ -76,6 +76,47 @@ alex.add_task("Luna", Task(
     description="Feather wand and puzzle toy",
 ))
 
+# --- Out-of-order tasks to test sorting and filtering ---
+alex.add_task("Luna", Task(
+    name="Evening Grooming",
+    category="grooming",
+    duration=15,
+    priority=3,
+    description="Brush coat",
+    must_occur_at="06:00 PM",
+))
+
+alex.add_task("Buddy", Task(
+    name="Afternoon Walk",
+    category="walk",
+    duration=20,
+    priority=2,
+    description="Short afternoon stroll",
+    must_occur_at="03:00 PM",
+))
+
+alex.add_task("Buddy", Task(
+    name="Teeth Brushing",
+    category="grooming",
+    duration=10,
+    priority=1,
+    description="Weekly dental care",
+    must_occur_at="09:00 AM",
+))
+
+# --- Intentional conflict: two tasks at the same time ---
+alex.add_task("Luna", Task(
+    name="Vet Check-In",
+    category="other",
+    duration=20,
+    priority=5,
+    description="Quick morning vet call",
+    must_occur_at="07:00 AM",   # same time as Buddy's Morning Walk
+))
+
+# Mark one task complete to test completion filter
+buddy.tasks[0].mark_complete()  # Morning Walk -> completed
+
 # --- Generate and print plan ---
 scheduler.generate_plan()
 
@@ -84,3 +125,30 @@ print("        Today's Schedule")
 print("=" * 40)
 print(scheduler.explain_reasoning())
 print("=" * 40)
+
+# --- Conflict detection ---
+print("\n--- detect_conflicts() ---")
+conflicts = scheduler.detect_conflicts()
+if conflicts:
+    for warning in conflicts:
+        print(f"  WARNING: {warning}")
+else:
+    print("  No conflicts detected.")
+
+# --- Test sort_by_time ---
+print("\n--- sort_by_time() ---")
+for task in scheduler.sort_by_time():
+    print(f"  {task.scheduled_time or 'unscheduled':12}  {task.name:20} ({task.pet_name})")
+
+# --- Test filter_tasks ---
+print("\n--- filter_tasks(pet_name='Buddy') ---")
+for task in scheduler.filter_tasks(pet_name="Buddy"):
+    print(f"  {task.name:20} completed={task.is_completed}")
+
+print("\n--- filter_tasks(completed=False) ---")
+for task in scheduler.filter_tasks(completed=False):
+    print(f"  {task.name:20} ({task.pet_name})")
+
+print("\n--- filter_tasks(completed=True) ---")
+for task in scheduler.filter_tasks(completed=True):
+    print(f"  {task.name:20} ({task.pet_name})")

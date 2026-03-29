@@ -22,6 +22,14 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Smarter Scheduling
+
+PawPal+ includes three scheduling utilities to help owners manage their daily plan:
+
+- Sort by time — orders all tasks chronologically, correctly handling AM/PM across both pets
+- Filter tasks — narrow the task list by pet name, completion status, or both
+- Conflict detection — automatically warns when two tasks are scheduled at the same time, grouped by time slot into a single readable message
+
 ## Getting started
 
 ### Setup

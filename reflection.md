@@ -39,10 +39,14 @@ Key design change was updating the pets object. I have now allowed the owner to 
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
 - How did you decide which constraints mattered most?
 
+The scheduler is constrained by the time, priority and duration of the task(s). Those three constraints are more important to consider as the app wants the user to create and modify their pets' plan based on the duration and priority of the task.
+
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+
+The scheduler only checks for exact time matches rather than whether a task's duration overlaps with the next task's start time, meaning two tasks starting minutes apart could still conflict without triggering a warning. This tradeoff is reasonable because generate_plan() already spaces flexible tasks sequentially so they won't overlap each other — the main real-world conflict is a user accidentally assigning two fixed tasks the same must_occur_at time, which exact matching catches directly. Since PawPal+ is a planning aid reviewed by the owner before use, a lightweight warning is sufficient without needing strict interval enforcement.
 
 ---
 
