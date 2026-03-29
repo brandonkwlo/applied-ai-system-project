@@ -1,0 +1,16 @@
+[project]
+name = "ai110-module2show-pawpal-starter"
+version = "0.1.0"
+description = "PawPal+ pet care scheduling app"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
