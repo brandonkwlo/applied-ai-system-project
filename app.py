@@ -1,5 +1,6 @@
 import streamlit as st
 from pawpal_system import Task, Pet, Owner, Scheduler
+from agent_system import run_agent, AgentResult
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -14,6 +15,12 @@ if "scheduler" not in st.session_state:
 
 if "plan_generated" not in st.session_state:
     st.session_state.plan_generated = False
+
+if "agent_result" not in st.session_state:
+    st.session_state.agent_result = None
+
+if "agent_running" not in st.session_state:
+    st.session_state.agent_running = False
 
 # Convenience references — use these throughout the rest of the app
 owner = st.session_state.owner
@@ -202,3 +209,85 @@ if st.session_state.plan_generated and scheduler.plan:
         st.write("**Skipped (insufficient time):**")
         for task in skipped:
             st.warning(f"{task.name} ({task.pet_name}) — {task.duration} min, priority {task.priority}")
+
+st.divider()
+
+# --- AI Optimizer ---
+st.subheader("AI Optimizer")
+
+if not st.session_state.plan_generated:
+    st.info("Generate a schedule first, then use the AI Optimizer to resolve conflicts and improve the plan.")
+elif not owner.pets or not owner.get_all_tasks():
+    st.info("Add at least one pet and one task before running the optimizer.")
+else:
+    st.write(
+        "The AI Optimizer reviews your schedule, resolves conflicts, and uses a pet care "
+        "knowledge base to make health-informed adjustments."
+    )
+
+    if st.button("Run AI Optimizer", disabled=st.session_state.agent_running, type="primary"):
+        st.session_state.agent_running = True
+        st.session_state.agent_result = None
+        with st.spinner("AI agent is optimizing your schedule…"):
+            result = run_agent(st.session_state.scheduler)
+        st.session_state.agent_result = result
+        st.session_state.agent_running = False
+        st.session_state.plan_generated = True
+        st.rerun()
+
+    result: AgentResult | None = st.session_state.agent_result
+
+    if result is not None:
+        if not result.success:
+            st.error(f"Optimizer error: {result.error}")
+        else:
+            st.success("Optimization complete.")
+
+            # --- Before / After metrics ---
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric(
+                    "Conflicts",
+                    result.after_conflict_count,
+                    delta=result.after_conflict_count - result.before_conflict_count,
+                    delta_color="inverse",
+                )
+            with col2:
+                st.metric(
+                    "Skipped Tasks",
+                    result.after_skipped_count,
+                    delta=result.after_skipped_count - result.before_skipped_count,
+                    delta_color="inverse",
+                )
+            st.caption(f"Iterations used: {result.iterations_used} / 7")
+
+            # --- Agent summary ---
+            if result.summary:
+                st.write("**Agent Summary**")
+                st.markdown(result.summary)
+
+            # --- Knowledge references ---
+            if result.retrieved_chunk_titles:
+                st.write("**Knowledge Base Articles Referenced**")
+                for title in result.retrieved_chunk_titles:
+                    st.markdown(f"- {title}")
+
+            # --- Action log ---
+            with st.expander("Full action log", expanded=False):
+                for entry in result.action_log:
+                    if entry.startswith("[KB SEARCH]"):
+                        st.markdown(f":mag: `{entry}`")
+                    elif entry.startswith("[ADD]"):
+                        st.markdown(f":heavy_plus_sign: `{entry}`")
+                    elif entry.startswith("[EDIT]"):
+                        st.markdown(f":pencil2: `{entry}`")
+                    elif entry.startswith("[REMOVE]"):
+                        st.markdown(f":wastebasket: `{entry}`")
+                    elif entry.startswith("[RESCHEDULE]"):
+                        st.markdown(f":clock3: `{entry}`")
+                    elif entry.startswith("[PLAN]"):
+                        st.markdown(f":calendar: `{entry}`")
+                    elif entry.startswith("[ERROR]"):
+                        st.error(entry)
+                    else:
+                        st.markdown(f"`{entry}`")
