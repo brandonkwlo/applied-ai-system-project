@@ -1,6 +1,6 @@
 """
 agent_system.py
-Gemini-powered agentic schedule optimizer for PawPal+.
+Groq-powered agentic schedule optimizer for PawPal+.
 
 Public entry point:
     run_agent(scheduler: Scheduler) -> AgentResult
@@ -12,8 +12,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
-from google import genai
-from google.genai import types
+from groq import Groq
 from dotenv import load_dotenv
 
 from pawpal_system import Scheduler, Task
@@ -23,7 +22,7 @@ load_dotenv()
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-MODEL = "gemini-2.0-flash"
+MODEL = "llama-3.3-70b-versatile"
 MAX_ITERATIONS = 7   # counts only mutation batches; search calls are free
 MAX_REMOVALS = 2
 
@@ -65,122 +64,133 @@ class AgentResult:
 
 # ── Tool schemas ──────────────────────────────────────────────────────────────
 
-def _build_tools() -> list[types.Tool]:
-    FD = types.FunctionDeclaration
-    S = types.Schema
-    T = types.Type
+def _build_tools() -> list[dict]:
+    """Return tools in OpenAI-compatible format (used by Groq)."""
 
-    def obj(**props: types.Schema) -> types.Schema:
-        return S(type=T.OBJECT, properties=props)
+    def fn(name: str, description: str, properties: dict, required: list[str]) -> dict:
+        return {
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": description,
+                "parameters": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                },
+            },
+        }
 
-    def str_prop(desc: str) -> types.Schema:
-        return S(type=T.STRING, description=desc)
+    def s(type_: str, desc: str) -> dict:
+        return {"type": type_, "description": desc}
 
-    def int_prop(desc: str) -> types.Schema:
-        return S(type=T.INTEGER, description=desc)
-
-    declarations = [
-        FD(
-            name="get_schedule_state",
-            description=(
+    return [
+        fn(
+            "get_schedule_state",
+            (
                 "Read the complete current schedule: the generated plan, all conflicts, "
                 "skipped tasks, and each pet's profile including health history and medication times. "
                 "Always call this first before making any changes."
             ),
-            parameters=obj(),
+            properties={},
+            required=[],
         ),
-        FD(
-            name="search_pet_care_knowledge",
-            description=(
+        fn(
+            "search_pet_care_knowledge",
+            (
                 "Search the curated pet care knowledge base for evidence-based guidance. "
                 "ALWAYS call this before adding or editing any task related to a health condition, "
                 "medication, breed-specific care, chronic illness, or life stage. "
                 "Returns the top 4 most relevant knowledge chunks. "
                 "Search calls do not count toward the iteration limit."
             ),
-            parameters=obj(
-                query=str_prop(
+            properties={
+                "query": s("string",
                     "Natural-language question to search. Be specific — include species, "
-                    "life stage, and condition (e.g. 'senior dog arthritis joint supplement timing')."
-                )
-            ),
+                    "life stage, and condition (e.g. 'senior dog arthritis joint supplement timing')."),
+            },
+            required=["query"],
         ),
-        FD(
-            name="edit_task",
-            description=(
+        fn(
+            "edit_task",
+            (
                 "Modify fields of an existing task. Use to change priority, duration, "
                 "must_occur_at, category, description, or frequency. "
                 "Do NOT change is_completed or task name."
             ),
-            parameters=obj(
-                pet_name=str_prop("Exact name of the pet who owns the task."),
-                task_name=str_prop("Exact name of the task to edit."),
-                changes=S(
-                    type=T.OBJECT,
-                    description=(
+            properties={
+                "pet_name": s("string", "Exact name of the pet who owns the task."),
+                "task_name": s("string", "Exact name of the task to edit."),
+                "changes": {
+                    "type": "object",
+                    "description": (
                         "Fields to update. Allowed: priority (int 1-5), duration (int minutes), "
                         "must_occur_at (str 'HH:MM AM/PM' or '' for flexible), "
                         "category (walk/feeding/meds/grooming/enrichment/other), "
                         "description (str), frequency (daily/weekly/once)."
                     ),
-                ),
-            ),
+                },
+            },
+            required=["pet_name", "task_name", "changes"],
         ),
-        FD(
-            name="add_task",
-            description=(
+        fn(
+            "add_task",
+            (
                 "Add a new task to a pet's schedule. Only use when a genuine care gap exists. "
                 "For health-related tasks, call search_pet_care_knowledge first."
             ),
-            parameters=obj(
-                pet_name=str_prop("Exact name of the pet to add the task to."),
-                task_name=str_prop("Short descriptive name for the task."),
-                category=str_prop("One of: walk, feeding, meds, grooming, enrichment, other."),
-                duration=int_prop("Duration in minutes (1-240)."),
-                priority=int_prop("Priority 1 (low) to 5 (high)."),
-                description=str_prop("Optional description."),
-                must_occur_at=str_prop("Fixed time 'HH:MM AM/PM', or '' for flexible."),
-                frequency=str_prop("One of: daily, weekly, once."),
-            ),
+            properties={
+                "pet_name": s("string", "Exact name of the pet to add the task to."),
+                "task_name": s("string", "Short descriptive name for the task."),
+                "category": s("string", "One of: walk, feeding, meds, grooming, enrichment, other."),
+                "duration": s("string", "Duration in minutes as a number, e.g. '20'."),
+                "priority": s("string", "Priority as a number 1 (low) to 5 (high), e.g. '3'."),
+                "description": s("string", "Optional description."),
+                "must_occur_at": s("string", "Fixed time 'HH:MM AM/PM', or '' for flexible."),
+                "frequency": s("string", "One of: daily, weekly, once."),
+            },
+            required=["pet_name", "task_name", "category", "duration", "priority"],
         ),
-        FD(
-            name="remove_task",
-            description=(
+        fn(
+            "remove_task",
+            (
                 "Remove a task from a pet's schedule. Subject to safety guards: "
                 "cannot remove the last meds or feeding task for any pet, "
                 "and at most 2 removals allowed per run. Prefer reschedule_task over this."
             ),
-            parameters=obj(
-                pet_name=str_prop("Exact name of the pet who owns the task."),
-                task_name=str_prop("Exact name of the task to remove."),
-                reason=str_prop("Required: why this task is being removed."),
-            ),
+            properties={
+                "pet_name": s("string", "Exact name of the pet who owns the task."),
+                "task_name": s("string", "Exact name of the task to remove."),
+                "reason": s("string", "Required: why this task is being removed."),
+            },
+            required=["pet_name", "task_name", "reason"],
         ),
-        FD(
-            name="reschedule_task",
-            description=(
+        fn(
+            "reschedule_task",
+            (
                 "Change the fixed time (must_occur_at) of a task to resolve a conflict. "
                 "Preferred over remove_task for conflict resolution. "
                 "Pass '' as new_time to make the task flexible."
             ),
-            parameters=obj(
-                pet_name=str_prop("Exact name of the pet who owns the task."),
-                task_name=str_prop("Exact name of the task to reschedule."),
-                new_time=str_prop("New time 'HH:MM AM/PM', or '' for flexible."),
-                reason=str_prop("Why this time change resolves the issue."),
-            ),
+            properties={
+                "pet_name": s("string", "Exact name of the pet who owns the task."),
+                "task_name": s("string", "Exact name of the task to reschedule."),
+                "new_time": s("string", "New time 'HH:MM AM/PM', or '' for flexible."),
+                "reason": s("string", "Why this time change resolves the issue."),
+            },
+            required=["pet_name", "task_name", "new_time", "reason"],
         ),
-        FD(
-            name="generate_plan",
-            description=(
+        fn(
+            "generate_plan",
+            (
                 "Regenerate the schedule after mutations. Call this after a batch of changes "
                 "to see updated conflict count and skipped tasks. "
                 "Call at most once per iteration batch."
             ),
-            parameters=obj(),
+            properties={},
+            required=[],
         ),
     ]
-    return [types.Tool(function_declarations=declarations)]
 
 
 # ── Tool executors ────────────────────────────────────────────────────────────
@@ -449,9 +459,9 @@ def run_agent(scheduler: Scheduler) -> AgentResult:
     """
     Run the agentic optimization loop.
     Mutates scheduler (and its owner's pets/tasks) in place.
-    Reads GEMINI_API_KEY from environment (loaded via dotenv).
+    Reads GROQ_API_KEY from environment (loaded via dotenv).
     """
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         return AgentResult(
             success=False,
@@ -463,7 +473,7 @@ def run_agent(scheduler: Scheduler) -> AgentResult:
             before_skipped_count=0,
             after_skipped_count=0,
             iterations_used=0,
-            error="GEMINI_API_KEY not set. Add it to your .env file.",
+            error="GROQ_API_KEY not set. Add it to your .env file.",
         )
 
     if not scheduler.owner.get_all_tasks():
@@ -480,7 +490,7 @@ def run_agent(scheduler: Scheduler) -> AgentResult:
             error="No tasks found. Add tasks before running the optimizer.",
         )
 
-    client = genai.Client(api_key=api_key)
+    client = Groq(api_key=api_key)
     tools = _build_tools()
 
     # Capture before-state
@@ -500,57 +510,70 @@ def run_agent(scheduler: Scheduler) -> AgentResult:
     iteration_count = 0
     final_summary = ""
 
-    chat = client.chats.create(
-        model=MODEL,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            tools=tools,
-        ),
-    )
+    messages: list[dict] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                "Please analyze and optimize my pet care schedule. "
+                "Start by calling get_schedule_state to understand the current situation."
+            ),
+        },
+    ]
 
     mutation_tools = {"edit_task", "add_task", "remove_task", "reschedule_task", "generate_plan"}
 
     try:
-        response = chat.send_message(
-            "Please analyze and optimize my pet care schedule. "
-            "Start by calling get_schedule_state to understand the current situation."
-        )
-
         while iteration_count < MAX_ITERATIONS:
-            # Collect function calls from this response
-            function_calls = response.function_calls or []
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=messages,
+                tools=tools,
+                tool_choice="auto",
+            )
 
-            if not function_calls:
-                # No more tool calls — extract final text
-                if response.text:
-                    final_summary = response.text
+            message = response.choices[0].message
+            finish_reason = response.choices[0].finish_reason
+
+            # Append assistant turn to message history
+            assistant_entry: dict = {"role": "assistant", "content": message.content or ""}
+            if message.tool_calls:
+                assistant_entry["tool_calls"] = [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                    }
+                    for tc in message.tool_calls
+                ]
+            messages.append(assistant_entry)
+
+            if finish_reason == "stop" or not message.tool_calls:
+                if message.content:
+                    final_summary = message.content
                 break
 
-            has_mutation = any(fc.name in mutation_tools for fc in function_calls)
+            has_mutation = any(
+                tc.function.name in mutation_tools for tc in message.tool_calls
+            )
 
-            # Execute all function calls and collect responses
-            tool_response_parts = []
-            for fc in function_calls:
+            # Execute each tool call and append results
+            for tc in message.tool_calls:
+                args = json.loads(tc.function.arguments)
                 result_str = _dispatch(
-                    name=fc.name,
-                    args=dict(fc.args),
+                    name=tc.function.name,
+                    args=args,
                     scheduler=scheduler,
                     action_log=action_log,
                     retrieved_titles=retrieved_titles,
                     seen_titles=seen_titles,
                     removal_count_ref=removal_count_ref,
                 )
-                tool_response_parts.append(
-                    types.Part(
-                        function_response=types.FunctionResponse(
-                            id=fc.id,
-                            name=fc.name,
-                            response={"result": result_str},
-                        )
-                    )
-                )
-
-            response = chat.send_message(tool_response_parts)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result_str,
+                })
 
             if has_mutation:
                 iteration_count += 1

@@ -41,10 +41,10 @@ Safety is enforced at two independent levels: the system prompt (Claude is instr
 
 # Setup
 
-1. Get a Free Gemini API Key
+1. Get a Free Groq API Key
 
-- Go to aistudio.google.com and sign in with your Google account
-- Click Get API key → Create API key
+- Go to console.groq.com and sign in
+- Click API Keys → Create API Key
 - Copy the key — you'll need it in Step 4
 
 2. Install Python and uv
@@ -59,10 +59,10 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 3. Install Dependencies
 
 ```
-uv add google-generativeai scikit-learn python-dotenv
+uv add groq scikit-learn python-dotenv
 ```
 
-google-generativeai — official Gemini Python SDK
+groq — official Groq Python SDK (uses llama-3.3-70b-versatile)
 
 scikit-learn — powers TF-IDF retrieval for the knowledge base
 
@@ -71,7 +71,7 @@ python-dotenv — loads your API key from the .env file
 4. Set Your API Key
 
 ```
-echo "GEMINI_API_KEY=your-key-here" > .env
+echo "GROQ_API_KEY=your-key-here" > .env
 ```
 
 Replace your-key-here with the key from Step 1. This file is gitignored and never committed.
@@ -110,22 +110,7 @@ User setup:
 - Tasks: "Morning Walk" pinned at 08:00 AM (30 min) and "Joint Supplement" pinned at 08:00 AM (10 min)
 - User clicks Run AI Optimizer
 
-Agent action log:
-
-```
-[PLAN] Initial state — 1 conflict, 0 skipped tasks
-[KB SEARCH] query='senior dog arthritis exercise joint supplement timing'
-→ "Exercise for Senior Dogs with Arthritis", "When to Start Joint Supplements in Dogs",
-"Medication Timing and Meal Pairing for Dogs"
-[RESCHEDULE] Buddy / 'Joint Supplement' → '08:30 AM'
-reason: Conflict with Morning Walk at 08:00 AM. Per KB: supplements are
-most effective given consistently with meals — moved to after morning walk.
-[PLAN] Updated — 0 conflicts, 0 skipped tasks
-```
-
-Agent summary:
-
-Resolved 1 conflict between "Morning Walk" and "Joint Supplement" for Buddy. Based on guidance that joint supplements are best absorbed when paired with food after light exercise, I moved "Joint Supplement" to 08:30 AM — immediately after the morning walk ends. No tasks were removed.
+<a href="screenshot1.png" target="_blank"><img src='/assets/screenshot1.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
 
 ## Interaction 2 — Adding Missing Enrichment for an Anxious Indoor Cat
 
@@ -134,23 +119,7 @@ User setup:
 - Pet: Luna, Cat, age 3, activity level: high, health notes: "Indoor only, stress-related over-grooming"
 - Tasks: "Morning Feeding" (flexible), "Evening Feeding" (flexible), "Vet Medication" at 07:00 AM
 
-Agent action log:
-
-```
-[PLAN] Initial state — 0 conflicts, 0 skipped tasks
-[KB SEARCH] query='indoor cat anxiety enrichment over-grooming stress'
-→ "Enrichment Strategies for Indoor Cats", "Cat Stress Signals in Multi-Pet Households",
-"Weight Management for Indoor Cats"
-[ADD] Luna / 'Feather Wand Play' (category=enrichment, duration=15min, priority=4, flexible)
-description: 10-15 min predatory play twice daily reduces stress behaviors per KB.
-[ADD] Luna / 'Evening Puzzle Feeder' (category=enrichment, duration=10min, priority=3, flexible)
-description: Puzzle feeders slow eating and provide mental stimulation.
-[PLAN] Updated — 0 conflicts, 0 skipped tasks, 2 tasks added
-```
-
-Agent summary:
-
-Luna's schedule had no enrichment tasks despite a health history indicating stress-related over-grooming. Retrieved knowledge recommends structured play sessions and puzzle feeders for high-anxiety indoor cats. Added a 15-minute feather wand session and a 10-minute evening puzzle feeder. Both are flexible so the scheduler will fit them into available time slots.
+<a href="screenshot2.png" target="_blank"><img src='/assets/screenshot2.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
 
 ## Interaction 3 — Prioritizing Within a Tight Time Budget
 
@@ -161,21 +130,7 @@ User setup:
 - Tasks: "Medication" priority 5 at 08:00 AM (5 min), "Morning Walk" priority 4 (45 min), "Grooming" priority 2 (30 min), "Trick Training" priority 1 (30 min), "Nail Trim" priority 2 (20 min)
 - Total task time: 130 min — exceeds 90 min budget
 
-Agent action log:
-
-```
-[PLAN] Initial state — 0 conflicts, 2 skipped tasks (Nail Trim, Trick Training)
-[KB SEARCH] query='dog grooming frequency nail trim adult medium breed'
-→ "Grooming Long-Coat Breeds: Frequency and Tools"
-[EDIT] Max / 'Nail Trim': duration 20 → 10
-reason: KB indicates nail trims for short-coat breeds typically take 8-10 min;
-original estimate was high.
-[PLAN] Updated — 0 conflicts, 1 skipped task (Trick Training)
-```
-
-Agent summary:
-
-With 130 minutes of tasks against a 90-minute budget, two tasks were skipped. I found that "Nail Trim" was over-estimated based on breed type — the knowledge base notes 8–10 minutes is typical for non-long-coat breeds, so I reduced its duration to 10 minutes. This freed enough time to schedule the nail trim. "Trick Training" (priority 1) remains skipped as the lowest-priority item — consider increasing available time or reducing another task's duration to include it.
+<a href="screenshot3.png" target="_blank"><img src='/assets/screenshot3.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
 
 # Design Decisions
 
