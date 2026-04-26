@@ -87,7 +87,7 @@ User setup:
 - Tasks: "Morning Walk" pinned at 08:00 AM (30 min) and "Joint Supplement" pinned at 08:00 AM (10 min)
 - User clicks Run AI Optimizer
 
-<a href="screenshot1.png" target="_blank"><img src='/assets/screenshot1.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
+<a href="interaction1.png" target="_blank"><img src='/assets/interaction1.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
 
 ## Interaction 2 — Adding Missing Enrichment for an Anxious Indoor Cat
 
@@ -96,7 +96,7 @@ User setup:
 - Pet: Luna, Cat, age 3, activity level: high, health notes: "Indoor only, stress-related over-grooming"
 - Tasks: "Morning Feeding" (flexible), "Evening Feeding" (flexible), "Vet Medication" at 07:00 AM
 
-<a href="screenshot2.png" target="_blank"><img src='/assets/screenshot2.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
+<a href="interaction2.png" target="_blank"><img src='/assets/interaction2.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
 
 ## Interaction 3 — Prioritizing Within a Tight Time Budget
 
@@ -107,7 +107,7 @@ User setup:
 - Tasks: "Medication" priority 5 at 08:00 AM (5 min), "Morning Walk" priority 4 (45 min), "Grooming" priority 2 (30 min), "Trick Training" priority 1 (30 min), "Nail Trim" priority 2 (20 min)
 - Total task time: 130 min — exceeds 90 min budget
 
-<a href="screenshot3.png" target="_blank"><img src='/assets/screenshot3.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
+<a href="interaction3.png" target="_blank"><img src='/assets/interaction3.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
 
 # Design Decisions
 
@@ -130,7 +130,6 @@ Streamlit re-runs the entire script on every interaction. Copying the owner/sche
 ## Why Python-level safety guards instead of relying only on the prompt
 
 Prompt instructions can be ignored or misinterpreted — especially in multi-step tool calling where the model's attention is split across a long context. Hard-coded checks in the tool executor functions (e.g., refusing to delete the last medication task) are unconditional and cannot be bypassed by any model behavior. The prompt is a first line of defense; the Python code is the guarantee.
-
 
 # What this project says about me as an AI engineer
 
