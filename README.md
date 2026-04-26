@@ -2,6 +2,8 @@
 
 An AI Pet Care Planning Streamlit app that takes care of planning the day for your pet. It also includes a chatbot to search that caters to the specified healthcare for the pet based on its age, species, health records, etc.
 
+Loom Presentation Link [here](https://www.loom.com/share/8d0d0c5253794399ac75ef62a092622b)
+
 <a href="screenshot.png" target="_blank"><img src='/assets/screenshot.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
 
 # Original Design
